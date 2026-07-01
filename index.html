@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기관방문 입력</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#fff; --line:#e3e8ef; --ink:#1f2733; --sub:#6b7684;
+    --brand:#2f6bff; --brand-d:#1f52d6; --ok:#12805c; --warn:#b45309; --chip:#eef3ff;
+    --radius:14px; --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif;
+       -webkit-font-smoothing:antialiased;font-size:15px;line-height:1.55}
+  .wrap{max-width:680px;margin:0 auto;padding:20px 16px 80px}
+  header h1{font-size:20px;font-weight:800;margin:6px 0 2px}
+  header p{margin:0 0 18px;color:var(--sub);font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+        box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
+  .field{margin-bottom:16px}
+  .field:last-child{margin-bottom:0}
+  label.lbl{display:block;font-weight:700;font-size:13px;margin-bottom:8px}
+  label.lbl .req{color:var(--brand);margin-left:3px}
+  input[type=date],input[type=text],select{
+    width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+    font-size:15px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(47,107,255,.12)}
+  .hint{color:var(--sub);font-size:12px;margin-top:6px}
+  .staff-grid{display:flex;flex-wrap:wrap;gap:8px}
+  .staff-btn{border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:8px 13px;border-radius:999px;font-size:14px;cursor:pointer;transition:.12s}
+  .staff-btn:hover{border-color:var(--brand)}
+  .staff-btn.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--chip);
+    border:1px solid #d6e0ff;color:var(--brand-d);border-radius:999px;padding:6px 10px 6px 12px;font-size:14px}
+  .chip b{font-weight:600}
+  .chip .x{cursor:pointer;font-weight:700;opacity:.6;font-size:16px;line-height:1}
+  .chip .x:hover{opacity:1}
+  .chip.warn{background:#fff7ed;border-color:#fed7aa;color:var(--warn)}
+  .addrow{display:flex;gap:8px}
+  .addrow input{flex:1}
+  .addrow button{white-space:nowrap;padding:0 16px;border:1px solid var(--brand);
+    background:var(--brand);color:#fff;border-radius:10px;font-weight:700;cursor:pointer}
+  .addrow button:hover{background:var(--brand-d)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}
+  .seg button{border:0;background:#fff;padding:8px 14px;font-size:13px;cursor:pointer;color:var(--sub)}
+  .seg button.on{background:var(--brand);color:#fff;font-weight:700}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{flex:1;min-width:140px;padding:13px;border-radius:11px;border:0;font-size:15px;font-weight:800;cursor:pointer}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.primary:hover{background:var(--brand-d)}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink);flex:0 0 auto;min-width:0;font-weight:600}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .preview{font-size:13.5px}
+  .preview .row{padding:9px 0;border-bottom:1px dashed var(--line)}
+  .preview .row:last-child{border-bottom:0}
+  .preview .tag{display:inline-block;font-weight:800;font-size:11px;color:#fff;background:var(--sub);
+    border-radius:6px;padding:2px 7px;margin-right:8px}
+  .tag.t1{background:#7c3aed}.tag.t2{background:#0d9488}
+  .muted{color:var(--sub)}
+  .result .ok{color:var(--ok);font-weight:700}
+  .result .wn{color:var(--warn)}
+  .result ul{margin:6px 0 12px;padding-left:20px}
+  .banner{padding:12px 14px;border-radius:10px;font-size:14px;margin-bottom:14px;display:none}
+  .banner.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;display:block}
+  .banner.done{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;display:block}
+  .loading{display:none;text-align:center;color:var(--sub);padding:12px}
+  .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);
+    border-top-color:var(--brand);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .diag{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;
+    background:#0f172a;color:#cbd5e1;border-radius:10px;padding:12px;margin-top:10px;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>기관방문 입력</h1>
+    <p id="ssname">연결 중…</p>
+  </header>
+
+  <div id="bootLoading" class="loading" style="display:block"><span class="spin"></span>담당자·기관 목록 불러오는 중…</div>
+  <div id="bootErr" class="banner err"></div>
+
+  <div id="app" style="display:none">
+    <div id="msg" class="banner"></div>
+
+    <div class="card">
+      <div class="field">
+        <label class="lbl" for="date">방문 날짜<span class="req">*</span></label>
+        <input type="date" id="date">
+      </div>
+
+      <div class="field">
+        <label class="lbl">방문자<span class="req">*</span> <span class="muted" style="font-weight:400">(복수 선택 가능)</span></label>
+        <div id="staffGrid" class="staff-grid"></div>
+        <div class="addrow" style="margin-top:10px">
+          <input type="text" id="staffCustom" placeholder="목록에 없는 방문자 직접 추가">
+          <button type="button" onclick="addCustomStaff()">추가</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="lbl">방문 기관<span class="req">*</span></label>
+        <div class="seg" id="modeSeg">
+          <button type="button" class="on" data-mode="multi" onclick="setMode('multi')">여러 기관 한 번에</button>
+          <button type="button" data-mode="single" onclick="setMode('single')">기관 개별 입력</button>
+        </div>
+        <div id="facChips" class="chips"></div>
+        <div class="addrow">
+          <input type="text" id="facInput" list="facList" placeholder="기관명 입력 후 Enter 또는 추가" autocomplete="off">
+          <button type="button" onclick="addFacility()">추가</button>
+        </div>
+        <datalist id="facList"></datalist>
+        <p class="hint">마스터에 있는 기관은 자동완성됩니다. <b>주황색 칩</b>은 마스터에 없는 신규 기관 → 새 행으로 추가됩니다.</p>
+      </div>
+
+      <div class="field" id="regionField" style="display:none">
+        <label class="lbl" for="region">지역 <span class="muted" style="font-weight:400">(신규 기관 행에 기입)</span></label>
+        <input type="text" id="region" list="regList" placeholder="예: 강남구" autocomplete="off">
+        <datalist id="regList"></datalist>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="lbl">기입 미리보기</label>
+      <div id="preview" class="preview muted">방문자와 기관을 입력하면 여기에 표시됩니다.</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="submitBtn" onclick="submit()">시트에 기입</button>
+      <button class="btn ghost" onclick="resetForm()">초기화</button>
+      <button class="btn ghost" onclick="runDiagnose(this)">구조 점검</button>
+    </div>
+    <pre id="diag" class="diag"></pre>
+
+    <div id="submitLoading" class="loading"><span class="spin"></span>기입 중…</div>
+    <div id="result" class="card result" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+  /* ============================================================
+   *  설정 — 배포 후 아래 두 값을 채우세요.
+   *   API_URL : GAS 웹앱 배포 URL (…/exec)
+   *   TOKEN   : Code.gs 의 API_TOKEN 과 동일한 값
+   * ============================================================ */
+  var CONFIG = {
+    API_URL: 'PASTE_YOUR_APPS_SCRIPT_WEBAPP_URL_HERE',
+    TOKEN:   'CHANGE-ME-여기에-길고-무작위한-문자열-넣기'
+  };
+
+  var META = { staff:[], facilities:[], regions:[] };
+  var FACSET = {};
+  var selectedStaff = [];
+  var facilities = [];
+  var mode = 'multi';
+
+  /* ── API 호출 (CORS 프리플라이트 회피: Content-Type 미지정 → text/plain) ── */
+  function apiGet(action){
+    var url = CONFIG.API_URL + '?action=' + encodeURIComponent(action)
+            + '&token=' + encodeURIComponent(CONFIG.TOKEN);
+    return fetch(url, { method:'GET' }).then(function(r){ return r.json(); });
+  }
+  function apiPost(bodyObj){
+    var body = JSON.stringify(Object.assign({ token: CONFIG.TOKEN }, bodyObj));
+    return fetch(CONFIG.API_URL, { method:'POST', body: body }).then(function(r){ return r.json(); });
+  }
+
+  /* ── 부팅 ── */
+  window.addEventListener('load', function(){
+    document.getElementById('date').value = todayISO();
+
+    if (CONFIG.API_URL.indexOf('PASTE_YOUR') === 0){
+      document.getElementById('bootLoading').style.display='none';
+      showBootErr('설정이 필요합니다: index.html 의 CONFIG.API_URL 과 CONFIG.TOKEN 을 채우세요.');
+      return;
+    }
+    apiGet('meta')
+      .then(function(res){
+        if(!res.ok) return showBootErr('불러오기 실패: ' + res.error);
+        onMeta(res.data);
+      })
+      .catch(function(e){ showBootErr('연결 실패: ' + e.message + ' (API_URL 또는 배포 권한을 확인하세요)'); })
+      .finally(function(){ document.getElementById('bootLoading').style.display='none'; });
+  });
+
+  function showBootErr(msg){
+    var b=document.getElementById('bootErr'); b.style.display='block'; b.textContent=msg;
+  }
+
+  function onMeta(meta){
+    META = meta;
+    (meta.facilities||[]).forEach(function(f){ FACSET[f]=true; });
+    document.getElementById('ssname').textContent = '대상: ' + meta.spreadsheetName;
+
+    var g = document.getElementById('staffGrid'); g.innerHTML='';
+    (meta.staff||[]).forEach(function(name){
+      var b=document.createElement('button');
+      b.type='button'; b.className='staff-btn'; b.textContent=name;
+      b.onclick=function(){ toggleStaff(name, b); };
+      g.appendChild(b);
+    });
+    var dl=document.getElementById('facList'); dl.innerHTML='';
+    (meta.facilities||[]).forEach(function(f){ var o=document.createElement('option'); o.value=f; dl.appendChild(o); });
+    var rl=document.getElementById('regList'); rl.innerHTML='';
+    (meta.regions||[]).forEach(function(r){ var o=document.createElement('option'); o.value=r; rl.appendChild(o); });
+
+    document.getElementById('app').style.display='block';
+
+    document.getElementById('facInput').addEventListener('keydown', function(e){
+      if(e.key==='Enter'){ e.preventDefault(); addFacility(); }
+    });
+    document.getElementById('staffCustom').addEventListener('keydown', function(e){
+      if(e.key==='Enter'){ e.preventDefault(); addCustomStaff(); }
+    });
+  }
+
+  /* ── 방문자 ── */
+  function toggleStaff(name, btn){
+    var i=selectedStaff.indexOf(name);
+    if(i>=0){ selectedStaff.splice(i,1); btn.classList.remove('on'); }
+    else { selectedStaff.push(name); btn.classList.add('on'); }
+    renderPreview();
+  }
+  function addCustomStaff(){
+    var el=document.getElementById('staffCustom'); var v=el.value.trim();
+    if(!v) return;
+    if(selectedStaff.indexOf(v)<0){
+      selectedStaff.push(v);
+      var g=document.getElementById('staffGrid');
+      var b=document.createElement('button');
+      b.type='button'; b.className='staff-btn on'; b.textContent=v;
+      b.onclick=function(){ toggleStaff(v,b); };
+      g.appendChild(b);
+    }
+    el.value=''; renderPreview();
+  }
+
+  /* ── 기관 ── */
+  function setMode(m){
+    mode=m;
+    document.querySelectorAll('#modeSeg button').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-mode')===m);
+    });
+    if(m==='single' && facilities.length>1){ facilities=[facilities[facilities.length-1]]; renderChips(); }
+  }
+  function addFacility(){
+    var el=document.getElementById('facInput'); var v=el.value.trim();
+    if(!v) return;
+    if(mode==='single') facilities=[];
+    if(facilities.indexOf(v)<0) facilities.push(v);
+    el.value=''; renderChips(); el.focus();
+  }
+  function removeFacility(v){
+    facilities=facilities.filter(function(x){return x!==v;}); renderChips();
+  }
+  function renderChips(){
+    var box=document.getElementById('facChips'); box.innerHTML='';
+    var hasNew=false;
+    facilities.forEach(function(f){
+      var isNew=!FACSET[f]; if(isNew) hasNew=true;
+      var c=document.createElement('span'); c.className='chip'+(isNew?' warn':'');
+      c.innerHTML='<b></b><span class="x">×</span>';
+      c.querySelector('b').textContent = f + (isNew?' (신규)':'');
+      c.querySelector('.x').onclick=function(){ removeFacility(f); };
+      box.appendChild(c);
+    });
+    document.getElementById('regionField').style.display = hasNew ? 'block' : 'none';
+    renderPreview();
+  }
+
+  /* ── 미리보기 ── */
+  function renderPreview(){
+    var p=document.getElementById('preview');
+    if(!selectedStaff.length || !facilities.length){
+      p.className='preview muted';
+      p.textContent='방문자와 기관을 입력하면 여기에 표시됩니다.'; return;
+    }
+    p.className='preview';
+    var mdd=mddFromInput();
+    var facTxt=facilities.join(', ');
+    var html='';
+    html+='<div class="row"><span class="tag t1">① 담당자×월</span>'
+        + selectedStaff.map(function(s){return '<b>'+esc(s)+'</b>';}).join(', ')
+        + ' → <span class="muted">'+esc(mdd)+' '+esc(facTxt)+'</span> 기록, 합계 +'+facilities.length+'</div>';
+    html+='<div class="row"><span class="tag t2">② 마스터</span>'
+        + facilities.map(function(f){
+            var isNew=!FACSET[f];
+            return '<div style="margin:3px 0">'+esc(f)+(isNew?' <span class="wn">(신규 행 추가)</span>':'')
+                 + ' → <span class="muted">'+esc(mdd)+' '+esc(selectedStaff.join(', '))+'</span></div>';
+          }).join('')
+        + '</div>';
+    p.innerHTML=html;
+  }
+
+  /* ── 제출 ── */
+  function submit(){
+    if(!selectedStaff.length){ flash('err','방문자를 1명 이상 선택하세요.'); return; }
+    if(!facilities.length){ flash('err','기관을 1개 이상 입력하세요.'); return; }
+    var payload={
+      action:'submit',
+      date: document.getElementById('date').value,
+      visitors: selectedStaff,
+      facilities: facilities,
+      region: document.getElementById('region').value.trim()
+    };
+    document.getElementById('submitBtn').disabled=true;
+    document.getElementById('submitLoading').style.display='block';
+    document.getElementById('result').style.display='none';
+    hideMsg();
+    apiPost(payload)
+      .then(function(res){
+        if(!res.ok){ flash('err','기입 실패: '+res.error); return; }
+        onSubmitOk(res.data);
+      })
+      .catch(function(e){ flash('err','통신 실패: '+e.message); })
+      .finally(function(){
+        document.getElementById('submitBtn').disabled=false;
+        document.getElementById('submitLoading').style.display='none';
+      });
+  }
+
+  function onSubmitOk(r){
+    flash('done','기입 완료되었습니다.');
+    var el=document.getElementById('result'); el.style.display='block';
+    var h='<label class="lbl">기입 결과 · '+esc(r.date)+'</label>';
+    h+='<div><span class="tag t1">①</span> '+r.logUpdated.map(esc).join(' / ')+'</div>';
+    if(r.logAddedStaff.length) h+='<div class="wn">· 신규 담당자 행 추가: '+r.logAddedStaff.map(esc).join(', ')+'</div>';
+    h+='<div style="margin-top:8px"><span class="tag t2">②</span> ';
+    var parts=[];
+    if(r.masterMatched.length) parts.push('<span class="ok">매칭 '+r.masterMatched.length+'건</span> ('+r.masterMatched.map(esc).join(', ')+')');
+    if(r.masterAdded.length)   parts.push('<span class="wn">신규 추가 '+r.masterAdded.length+'건</span> ('+r.masterAdded.map(esc).join(', ')+')');
+    h+= parts.length?parts.join('<br>'):'변경 없음';
+    h+='</div>';
+    if(r.notes.length) h+='<ul>'+r.notes.map(function(n){return '<li class="muted">'+esc(n)+'</li>';}).join('')+'</ul>';
+    h+='<p class="hint" style="margin-top:10px">기관 입력을 계속하려면 기관 칩만 지우고 이어서 입력하세요.</p>';
+    el.innerHTML=h;
+    facilities=[]; renderChips();
+  }
+
+  /* ── 구조 점검 ── */
+  function runDiagnose(btn){
+    btn.disabled=true;
+    apiPost({action:'diagnose'})
+      .then(function(res){
+        if(!res.ok){ flash('err','점검 실패: '+res.error); return; }
+        var d=document.getElementById('diag'); d.style.display='block';
+        d.textContent=JSON.stringify(res.data,null,2);
+      })
+      .catch(function(e){ flash('err','점검 실패: '+e.message); })
+      .finally(function(){ btn.disabled=false; });
+  }
+
+  /* ── 유틸 ── */
+  function resetForm(){
+    selectedStaff=[]; facilities=[];
+    document.querySelectorAll('.staff-btn').forEach(function(b){b.classList.remove('on');});
+    document.getElementById('region').value='';
+    document.getElementById('date').value=todayISO();
+    renderChips(); hideMsg();
+    document.getElementById('result').style.display='none';
+    document.getElementById('diag').style.display='none';
+  }
+  function flash(type,txt){ var m=document.getElementById('msg'); m.className='banner '+(type==='err'?'err':'done'); m.textContent=txt; window.scrollTo({top:0,behavior:'smooth'}); }
+  function hideMsg(){ var m=document.getElementById('msg'); m.className='banner'; m.textContent=''; }
+  function todayISO(){ var d=new Date(); var o=d.getTimezoneOffset(); d=new Date(d.getTime()-o*60000); return d.toISOString().slice(0,10); }
+  function mddFromInput(){ var v=document.getElementById('date').value; if(!v) return ''; var p=v.split('-'); return parseInt(p[1],10)+'/'+parseInt(p[2],10); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+</script>
+</body>
+</html>
