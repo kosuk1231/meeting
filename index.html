@@ -139,15 +139,15 @@
 
     <div class="card">
       <label class="lbl" style="cursor:pointer;user-select:none" onclick="toggleManage()">
-        담당자 관리 <span id="manageCaret">▾</span>
-        <span class="muted" style="font-weight:400">· 임의로 추가한 담당자 행 삭제</span>
+        기록 수정 <span id="manageCaret">▾</span>
+        <span class="muted" style="font-weight:400">· 담당자 기록에서 기관명만 제거</span>
       </label>
       <div id="manageBody" style="display:none;margin-top:8px">
         <div class="addrow">
           <select id="manageSelect" style="flex:1"></select>
-          <button type="button" onclick="previewStaff()">확인</button>
+          <button type="button" onclick="previewStaff()">불러오기</button>
         </div>
-        <div id="managePreview" class="preview muted" style="margin-top:10px">삭제할 담당자를 선택하고 ‘확인’을 누르세요.</div>
+        <div id="managePreview" class="preview muted" style="margin-top:10px">담당자를 선택하고 ‘불러오기’를 누르면 기록된 기관이 표시됩니다.</div>
       </div>
     </div>
 
@@ -417,39 +417,58 @@
     var name=document.getElementById('manageSelect').value;
     if(!name) return;
     var box=document.getElementById('managePreview');
-    box.className='preview muted'; box.textContent='확인 중…';
+    box.className='preview muted'; box.textContent='불러오는 중…';
     apiPost({action:'preview_staff', name:name}).then(function(res){
       if(!res.ok){ box.className='preview'; box.innerHTML='<span class="wn">'+esc(res.error)+'</span>'; return; }
-      var d=res.data; box.className='preview';
-      if(!d.found){ box.textContent='시트에서 찾지 못했습니다: '+name; return; }
-      box.innerHTML='';
-      var r1=document.createElement('div'); r1.className='row';
-      r1.innerHTML='<b>'+esc(d.name)+'</b> · 시트 '+d.rowNumber+'행 '
-        + (d.isTracked ? '<span class="wn">(앱이 추가한 행)</span>'
-                       : '<span class="wn">(기존 명단 — 주의!)</span>');
-      box.appendChild(r1);
-      var r2=document.createElement('div'); r2.className='row muted';
-      r2.textContent = d.filled.length ? ('기록: '+d.filled.join(' / ')+' · 누계 '+d.total)
-                                       : '기록된 방문 없음 (빈 행)';
-      box.appendChild(r2);
-      var wrap=document.createElement('div'); wrap.style.marginTop='10px';
-      var del=document.createElement('button');
-      del.className='btn'; del.style.background='#dc2626'; del.style.color='#fff';
-      del.textContent='이 담당자 행 삭제';
-      del.onclick=function(){ doDeleteStaff(d.name); };
-      wrap.appendChild(del); box.appendChild(wrap);
+      renderStaffEntries(res.data);
     }).catch(function(e){ box.className='preview'; box.innerHTML='<span class="wn">'+esc(e.message)+'</span>'; });
   }
-  function doDeleteStaff(name){
-    if(!window.confirm('“'+name+'” 담당자 행을 시트에서 완전히 삭제합니다.\n되돌릴 수 없습니다. 진행할까요?')) return;
-    apiPost({action:'delete_staff', name:name}).then(function(res){
-      if(!res.ok){ flash('err','삭제 실패: '+res.error); return; }
-      flash('done','삭제 완료: '+res.data.name+' ('+res.data.rowNumber+'행)');
-      var i=selectedStaff.indexOf(name); if(i>=0) selectedStaff.splice(i,1);
-      var box=document.getElementById('managePreview');
-      box.className='preview muted'; box.textContent='삭제할 담당자를 선택하고 ‘확인’을 누르세요.';
-      reloadMeta();
-    }).catch(function(e){ flash('err','통신 실패: '+e.message); });
+  function renderStaffEntries(d){
+    var box=document.getElementById('managePreview');
+    box.className='preview'; box.innerHTML='';
+    if(!d.found){ box.textContent='시트에서 찾지 못했습니다: '+d.name; return; }
+
+    var head=document.createElement('div'); head.className='row';
+    head.innerHTML='<b>'+esc(d.name)+'</b> · 시트 '+d.rowNumber+'행 · 총 '+d.total+'건'
+      + (d.isTracked?' <span class="wn">(앱이 추가한 담당자)</span>':'');
+    box.appendChild(head);
+
+    if(!d.entries.length){
+      var none=document.createElement('div'); none.className='row muted'; none.textContent='기록된 기관이 없습니다.';
+      box.appendChild(none); return;
+    }
+
+    // 월별로 묶어서 표시
+    var byMonth={};
+    d.entries.forEach(function(e){ (byMonth[e.month]=byMonth[e.month]||[]).push(e); });
+    Object.keys(byMonth).map(Number).sort(function(a,b){return a-b;}).forEach(function(mo){
+      var wrap=document.createElement('div'); wrap.className='row';
+      var lab=document.createElement('div'); lab.style.fontWeight='700'; lab.style.fontSize='12px';
+      lab.style.color='var(--sub)'; lab.style.margin='2px 0 6px'; lab.textContent=mo+'월';
+      wrap.appendChild(lab);
+      var chips=document.createElement('div'); chips.className='chips';
+      byMonth[mo].forEach(function(e){
+        var c=document.createElement('span'); c.className='chip warn';
+        var t=document.createElement('b'); t.textContent=(e.date?e.date+' ':'')+e.facility;
+        var x=document.createElement('span'); x.className='x'; x.textContent='×';
+        x.onclick=function(){ removeEntry(d.name, e, c); };
+        c.appendChild(t); c.appendChild(x); chips.appendChild(c);
+      });
+      wrap.appendChild(chips); box.appendChild(wrap);
+    });
+    var hint=document.createElement('p'); hint.className='hint';
+    hint.textContent='×를 누르면 그 기관명만 제거되고 합계·누계가 다시 계산됩니다. (①시트만 변경)';
+    box.appendChild(hint);
+  }
+  function removeEntry(staff, e, chipEl){
+    if(!window.confirm('“'+staff+'” '+e.month+'월 '+(e.date||'')+' · '+e.facility+'\n이 기관명을 기록에서 제거할까요?')) return;
+    apiPost({action:'remove_facility', name:staff, month:e.month, date:e.date, facility:e.facility})
+      .then(function(res){
+        if(!res.ok){ flash('err','제거 실패: '+res.error); return; }
+        chipEl.remove();
+        flash('done','제거됨: '+e.month+'월 '+e.facility+' (누계 '+res.data.total+')');
+        previewStaff(); // 최신 상태로 새로고침
+      }).catch(function(err){ flash('err','통신 실패: '+err.message); });
   }
 
   /* ── 유틸 ── */
