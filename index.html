@@ -1,3 +1,245 @@
+
+1uhFbDx_9bCUABMNeFme57c6q8Txjq9XBQ6zmPiNX0-g
+
+구글 스프레드시트 내 '2026년 기관방문 현황' 시트와 '방문현황(2026 입력중)'에 데이터를 입력하는 앱을 만들고 싶어
+기관을 방문하고, 방문자가 다녀온 곳을 입력하면 2개의 시트에서 기관명을 매칭해서 자동으로 시트에 기입하는 앱을 구성해보자
+
+
+도구 제약을 파악하고 스프레드시트 접근 방법을 모색했다
+도구 제약을 파악하고 스프레드시트 접근 방법을 모색했다
+스프레드시트는 직접 열람이 안 되네요. 시트 내용을 읽을 수 있는 다른 도구를 찾아보겠습니다.
+
+
+복잡한 스프레드시트 구조를 분석하고 명확화 질문을 구성했다
+복잡한 스프레드시트 구조를 분석하고 명확화 질문을 구성했다
+스프레드시트를 열어봤습니다. 두 시트의 성격이 서로 달라서, 앱이 각각에 다르게 써야 할 것 같아 구조를 먼저 정리해볼게요.
+
+제가 파악한 두 시트의 역할은 이렇습니다.
+
+① 2026년 기관방문 현황 — 담당자별 · 월별 방문 기록 시트로 보입니다. 행은 담당자(곽경인, 이지선, 정승아, 고석우…), 열은 담당자 · 1월/시설명 · 1월/합계 · 2월/시설명 · 2월/합계 … 12월 · 누계 구조. 각 월 셀에 "2/26 강북발달장애인평생교육센터, 강북노인종합복지관" 같은 텍스트가 누적되고, 합계·누계는 방문 기관 수 카운트.
+
+② 방문현황(2026 입력중) — 지역별 기관 마스터로 보입니다. 지역 · (연도별 기관명 열들) · 기타 · 주소 · 연락처 · 2022~2026 기관방문 구조. 기관명이 연도별 열(단체납부 열)과 기타 열에 걸쳐 흩어져 있고, 방문 기록은 2026 기관방문 열에 "2/26 고석우" 형태로 들어감.
+
+그래서 앱의 동작은 이렇게 됩니다.
+
+입력: 날짜 + 방문자(1명 이상) + 다녀온 기관 목록
+→ ①에서 방문자 행 + 해당 월 셀에 "날짜 기관명, 기관명" 추가 + 합계/누계 갱신
+→ ②에서 각 기관명을 마스터에서 찾아 2026 기관방문 셀에 "날짜 방문자" 기입
+
+이 구조가 맞는지, 그리고 몇 가지 결정이 필요한 부분을 확인하고 싶습니다.
+
+질문: 제가 파악한 두 시트의 역할(①담당자×월 기록 / ②지역별 기관 마스터에 연도별 방문기록)이 맞나요?
+답변: 맞음, 그대로 진행
+
+질문: 입력 단위는 어떻게 할까요?
+답변: 둘 다 지원
+
+질문: ②마스터에 없는 신규 기관을 입력했을 때 처리 방식은?
+답변: 새 행 자동 추가
+
+
+두 시트 구조 파악 후 자동 감지 기반 앱 설계했음
+두 시트 구조 파악 후 자동 감지 기반 앱 설계했음
+구조 확정됐습니다. 아래 방향으로 만들겠습니다.
+
+백엔드: Google Apps Script 웹앱 (스프레드시트에 바인딩) — 두 시트 구조를 런타임에 헤더로 자동 감지해서, 열 위치가 조금 바뀌어도 안 깨지게 합니다.
+프런트: 같은 웹앱이 서빙하는 단일 HTML 폼 (google.script.run 사용 → CORS·배포 URL 관리 불필요).
+동작: 날짜 + 방문자(다중) + 기관(1개 또는 여러 개) 입력 → ①담당자×월 셀에 누적·합계·누계 갱신, ②마스터에서 기관명 매칭해 2026 기관방문 열에 기입, 없으면 새 행 추가.
+먼저 백엔드부터 작성하겠습니다.
+
+
+프론트엔드 Index.html 파일 구현 준비했다
+프론트엔드 Index.html 파일 구현 준비했다
+이제 프런트엔드 HTML을 작성하겠습니다.
+
+
+간결한 설명과 파일 구성을 준비했습니다
+간결한 설명과 파일 구성을 준비했습니다
+마지막으로 설치·배포 안내서를 만들겠습니다.
+
+
+파일 생성됨, 파일 읽음
+파일 생성됨, 파일 읽음
+세 파일 다 만들었습니다.
+
+핵심 설계는 열 위치를 하드코딩하지 않고 헤더로 런타임 감지한 점입니다. 두 시트가 워낙 복잡하고(마스터는 연도별 이름열이 5개 + 기타열에 걸쳐 있고, 행이 1,000개 넘음), 앞으로 열이 밀리거나 시트가 확장돼도 안 깨지게 하려는 의도입니다.
+
+동작 흐름은 확정하신 대로입니다.
+
+① 2026년 기관방문 현황: 방문자 행 × 해당 월 셀에 M/D 기관1, 기관2 누적 → 월 합계 += 기관수, 누계 재계산.
+② 방문현황(2026 입력중): 기관명을 이름열·기타열에서 정확히 일치로 찾아 2026 기관방문 셀에 M/D 방문자 기입. 못 찾으면 새 행 자동 추가.
+입력 단위는 둘 다 지원 — 폼 상단 토글로 "여러 기관 한 번에 / 개별" 전환, 방문자는 복수 선택.
+중복 방지(락 + "이미 기록됨" 체크), 신규 기관은 주황색 칩으로 표시하고 지역 입력란이 열립니다.
+설치 전에 딱 하나 — 편집기에서 diagnose()를 한 번 돌려(또는 폼의 "구조 점검" 버튼) 감지된 열이 실제와 맞는지 확인해 주세요. 특히 ①의 누계열과 ②의 2026 기관방문 기록열이 정확히 잡혔는지가 관건입니다. 결과를 붙여주시면 어긋난 부분만 바로 맞추겠습니다.
+
+
+Code
+GS 
+
+Index
+코드 · HTML 
+
+Readme
+문서 · MD 
+git hub로 올려서 vercel로 배포
+
+
+GAS 백엔드와 Vercel 프론트엔드 아키텍처 재설계했다
+GAS 백엔드와 Vercel 프론트엔드 아키텍처 재설계했다
+GitHub → Vercel 배포용으로 아키텍처를 바꾸겠습니다. google.script.run(웹앱 내장 방식)은 Vercel 외부 도메인에서 못 쓰니, GAS를 JSON API(doGet/doPost)로 만들고 정적 index.html이 fetch로 호출하는, 평소 쓰시던 구조로 재구성합니다. CORS 프리플라이트를 피하려고 POST는 text/plain 단순요청으로 보냅니다.
+
+
+Vercel 배포를 위한 정적 HTML 구조를 구상했다
+Vercel 배포를 위한 정적 HTML 구조를 구상했다
+Vercel 배포 구조로 재구성했습니다. 리포 구조는 이렇습니다.
+
+├─ index.html            ← Vercel이 서빙 (fetch로 API 호출)
+├─ apps-script/Code.gs   ← Apps Script 편집기용 (Vercel과 무관)
+└─ README.md             ← 배포 단계
+바뀐 핵심은 세 가지입니다.
+
+google.script.run → JSON API로 전환했습니다. GAS가 doGet(meta)·doPost(submit/diagnose)로 응답하고, 프런트는 fetch로 호출합니다. POST는 Content-Type을 지정하지 않아 text/plain 단순요청이 되므로 CORS 프리플라이트가 발생하지 않습니다 — 이 스택에서 제일 자주 막히는 지점을 피한 겁니다.
+
+토큰 게이트를 넣었습니다. 웹앱을 "모든 사용자" 액세스로 열어야 Vercel 페이지가 로그인 없이 호출할 수 있는데, 그러면 아무나 쓰기가 가능해지니 API_TOKEN으로 막습니다. 다만 정적 파일이라 토큰이 소스에 노출되므로, 더 잠그려면 Vercel Deployment Protection을 함께 쓰시는 걸 README에 적어뒀습니다.
+
+배포 순서는 ① GAS 배포(토큰 설정 + URL 확보) → ② index.html의 CONFIG 두 값 채우기 → ③ GitHub push → ④ Vercel Import(Framework: Other) 입니다.
+
+두 가지만 짚어두면, 코드 수정 후에는 GAS를 반드시 "새 버전"으로 재배포해야 반영되고(기존 배포 편집), 토큰은 Code.gs와 index.html 양쪽을 같은 값으로 맞춰야 합니다. 배포하다 연결이 막히면 그 화면 그대로 알려주세요.
+
+
+Index
+코드 · HTML 
+
+Code
+GS 
+
+Readme
+문서 · MD 
+api token은 어디서 확인해?
+
+
+API 토큰 생성 위치에 대해 명확히 했다
+API 토큰 생성 위치에 대해 명확히 했다
+API_TOKEN은 어딘가에서 발급받는 게 아니라, 본인이 직접 정하는 비밀번호입니다. 지금 코드에는 자리표시자(CHANGE-ME-여기에-...)만 들어 있어서, 원하는 무작위 문자열로 바꿔 넣으시면 그게 곧 토큰이 됩니다.
+
+만드는 방법 아무거나 하나 쓰시면 됩니다.
+
+브라우저에서 F12 → 콘솔에 crypto.randomUUID() 입력 → 나온 값 복사 (예: 9f3c1a7e-...)
+아니면 그냥 아무 긴 문자열이라도 됩니다 (예: sasw-visit-2026-8Kd9xQ)
+그리고 같은 값을 두 군데에 넣어야 합니다.
+
+apps-script/Code.gs 상단
+js
+const API_TOKEN = '여기에 방금 만든 값';
+index.html 상단 CONFIG
+js
+TOKEN: '여기에 같은 값',
+둘이 다르면 "인증 실패(token 불일치)"가 뜹니다. 토큰을 바꿀 때도 항상 양쪽을 같이 고치고 GAS를 새 버전으로 재배포하면 됩니다.
+
+참고로 이건 "이미 존재하는 값을 확인"하는 개념이 아니라 "내가 정해서 심는" 값이라, 혼동되셨던 것 같습니다. 혹시 지금 열어둔 화면에서 토큰 넣을 위치가 안 보이면 말씀해 주세요.
+
+1782901944941_image.png
+2026년 기관방문 현황 시트에서 b열이 담당자 명단
+
+
+감지 실패 원인 분석 후 견고한 대체 로직 설계했음
+감지 실패 원인 분석 후 견고한 대체 로직 설계했음
+원인은 그 시트의 헤더에 "담당자"라는 글자가 없어서입니다. 제 코드가 "담당자" 텍스트 셀을 기준으로 열을 찾는데, 이 시트는 헤더가 1/시설명·월/소계·월/총계 형태라 매칭이 안 됐네요. 알려주신 대로 B열을 담당자 열로 고정하고, 헤더행은 "시설명" 마커로 찾도록 감지 로직을 고치겠습니다.
+
+먼저 상단에 보정 상수를 추가합니다.
+
+
+함수 본문 수정을 계획했습니다
+함수 본문 수정을 계획했습니다
+이제 detectLog_ 함수를 견고하게 교체합니다.
+
+
+파일 수정됨, 파일 읽음
+파일 수정됨, 파일 읽음
+수정했습니다. 바뀐 감지 로직은 이렇습니다.
+
+헤더에 "담당자" 글자가 있으면 그걸로 잡고,
+없으면 "시설명"이 들어간 행을 헤더행으로 찾고 담당자 열은 B열(고정) 로 사용,
+총계 열은 총계·누계·계 를 모두 인식(이 시트의 월/총계도 잡힘).
+적용하실 순서입니다.
+
+Apps Script 편집기에서 Code.gs를 새 버전 전체로 교체(붙여넣기).
+diagnose 함수 실행 → 로그에서 매핑 확인.
+배포 → 배포 관리 → 편집(연필) → 버전: 새 버전 → 배포 (기존 URL 유지됨).
+Vercel 페이지 새로고침.
+이제 화면이 뜨면 "구조 점검" 버튼을 눌러 나온 결과를 붙여주세요. 특히 이 두 가지만 확인하면 됩니다.
+
+1월_시설명이 실제 1월 기관명이 들어가는 열과 같은지 (월별로 시설명·합계 두 칸씩 반복이 맞는지)
+누계열이 실제 누계/총계 열과 같은지
+만약 이 시트가 월당 두 칸(시설명+합계)이 아니라 다른 배치라면 그 부분만 맞추면 되니, 점검 결과를 보여주시면 바로 조정하겠습니다.
+
+
+Code
+GS 
+담당자를 임의로 추가한 내역을 삭제하는 기능
+
+
+프론트엔드 리팩토링하며 담당자 관리 기능 구현 중
+프론트엔드 리팩토링하며 담당자 관리 기능 구현 중
+앱이 자동으로 추가한 담당자 행을 앱 안에서 삭제하는 기능을 넣겠습니다. 안전하게 하려고 두 가지를 지킵니다.
+
+앱이 새로 추가한 담당자는 따로 기록해 두고, 관리 화면에서 "앱 추가"로 표시합니다.
+삭제 전에 그 행에 어떤 방문 기록이 들어있는지 미리 보여주고, 한 번 더 확인받습니다 (기존 명단을 실수로 지우는 것 방지).
+백엔드부터 수정합니다.
+
+
+담당자 추가 기능을 리팩토링하고 삭제 인터페이스를 구축했다
+담당자 추가 기능을 리팩토링하고 삭제 인터페이스를 구축했다
+이제 프런트엔드에 "담당자 관리" 화면을 추가하고, 폼에서 임의 추가한 방문자 버튼도 지울 수 있게 하겠습니다.
+
+먼저 초기화 로직을 재사용 가능하게 분리합니다.
+
+
+코드 검증 및 구문 오류 확인을 수행했습니다
+코드 검증 및 구문 오류 확인을 수행했습니다
+두 파일 다 수정 완료했습니다. 빠르게 정합성만 확인하겠습니다.
+
+
+신규 함수/라우팅 존재 확인
+신규 함수/라우팅 존재 확인
+All wired up correctly. 파일을 전달합니다.
+
+
+Presented 2 files
+Presented 2 files
+추가된 기능입니다.
+
+시트에 있는 담당자 행 삭제 — 폼 아래 "담당자 관리" 섹션을 펼치면 담당자를 선택하고 "확인"을 누릅니다. 그러면 그 행이 시트 몇 번째 행이고, 월별로 어떤 방문 기록이 들어있는지(누계 포함) 먼저 보여줍니다. 그 상태에서 빨간 "이 담당자 행 삭제" 버튼 → 한 번 더 확인 → 시트에서 해당 행이 삭제됩니다.
+
+안전장치 두 가지를 뒀습니다.
+
+앱이 자동 추가한 담당자는 목록에 **"· 앱 추가"**로 표시되고, 미리보기에 "(앱이 추가한 행)"이라고 나옵니다. 기존 명단(곽경인 등)을 고르면 "(기존 명단 — 주의!)" 경고가 뜹니다.
+삭제 전에 행 내용을 보여주고 되돌릴 수 없다는 확인창을 거칩니다.
+폼에서 임의 추가한 방문자 지우기 — 방문자를 직접 추가하면 이제 버튼에 ✕가 붙어서, 잘못 넣었으면 제출 전에 바로 지울 수 있습니다.
+
+적용은 늘 하던 대로입니다.
+
+Code.gs 전체 교체 → 저장
+index.html 교체 → GitHub push (Vercel 자동 재배포)
+GAS는 새 버전으로 재배포 (코드가 바뀌었으니 필수)
+참고로 이 삭제 기능은 행 하나를 통째로 지웁니다. 앱이 추가한 행은 항상 맨 아래에 붙으니 안전하지만, 만약 그 시트에 소계/합계 수식이 특정 행을 참조하고 있다면 중간 행 삭제 시 영향이 있을 수 있습니다. 지우려는 게 맨 아래 추가분이면 걱정 없습니다. 혹시 "앱 추가분만 골라서 한 번에 정리" 같은 일괄 삭제도 필요하면 붙여드릴게요.
+
+
+Code
+GS 
+
+Index
+코드 · HTML 
+
+
+
+
+
+Claude는 AI이며 실수할 수 있습니다. 응답을 다시 한번 확인해 주세요.
+
+
+Index · HTML
+복사됨
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -81,19 +323,19 @@
     <h1>기관방문 입력</h1>
     <p id="ssname">연결 중…</p>
   </header>
-
+ 
   <div id="bootLoading" class="loading" style="display:block"><span class="spin"></span>담당자·기관 목록 불러오는 중…</div>
   <div id="bootErr" class="banner err"></div>
-
+ 
   <div id="app" style="display:none">
     <div id="msg" class="banner"></div>
-
+ 
     <div class="card">
       <div class="field">
         <label class="lbl" for="date">방문 날짜<span class="req">*</span></label>
         <input type="date" id="date">
       </div>
-
+ 
       <div class="field">
         <label class="lbl">방문자<span class="req">*</span> <span class="muted" style="font-weight:400">(복수 선택 가능)</span></label>
         <div id="staffGrid" class="staff-grid"></div>
@@ -102,7 +344,7 @@
           <button type="button" onclick="addCustomStaff()">추가</button>
         </div>
       </div>
-
+ 
       <div class="field">
         <label class="lbl">방문 기관<span class="req">*</span></label>
         <div class="seg" id="modeSeg">
@@ -117,31 +359,45 @@
         <datalist id="facList"></datalist>
         <p class="hint">마스터에 있는 기관은 자동완성됩니다. <b>주황색 칩</b>은 마스터에 없는 신규 기관 → 새 행으로 추가됩니다.</p>
       </div>
-
+ 
       <div class="field" id="regionField" style="display:none">
         <label class="lbl" for="region">지역 <span class="muted" style="font-weight:400">(신규 기관 행에 기입)</span></label>
         <input type="text" id="region" list="regList" placeholder="예: 강남구" autocomplete="off">
         <datalist id="regList"></datalist>
       </div>
     </div>
-
+ 
     <div class="card">
       <label class="lbl">기입 미리보기</label>
       <div id="preview" class="preview muted">방문자와 기관을 입력하면 여기에 표시됩니다.</div>
     </div>
-
+ 
     <div class="actions">
       <button class="btn primary" id="submitBtn" onclick="submit()">시트에 기입</button>
       <button class="btn ghost" onclick="resetForm()">초기화</button>
       <button class="btn ghost" onclick="runDiagnose(this)">구조 점검</button>
     </div>
     <pre id="diag" class="diag"></pre>
-
+ 
+    <div class="card">
+      <label class="lbl" style="cursor:pointer;user-select:none" onclick="toggleManage()">
+        담당자 관리 <span id="manageCaret">▾</span>
+        <span class="muted" style="font-weight:400">· 임의로 추가한 담당자 행 삭제</span>
+      </label>
+      <div id="manageBody" style="display:none;margin-top:8px">
+        <div class="addrow">
+          <select id="manageSelect" style="flex:1"></select>
+          <button type="button" onclick="previewStaff()">확인</button>
+        </div>
+        <div id="managePreview" class="preview muted" style="margin-top:10px">삭제할 담당자를 선택하고 ‘확인’을 누르세요.</div>
+      </div>
+    </div>
+ 
     <div id="submitLoading" class="loading"><span class="spin"></span>기입 중…</div>
     <div id="result" class="card result" style="display:none"></div>
   </div>
 </div>
-
+ 
 <script>
   /* ============================================================
    *  설정 — 배포 후 아래 두 값을 채우세요.
@@ -149,16 +405,16 @@
    *   TOKEN   : Code.gs 의 API_TOKEN 과 동일한 값
    * ============================================================ */
   var CONFIG = {
-    API_URL: 'https://script.google.com/macros/s/AKfycbxypIN68epA2-XYVAZvwqlamunAU6jdPluISPtrBrWuA6GAOvUVBl314NhFfrI0P6hNjg/exec',
-    TOKEN:   'hello_sasw_7862962!'
+    API_URL: 'https://script.google.com/macros/s/AKfycbxypIN68epA2-XYVAZvwqlamunAU6jdPluISPtrBrWuA6GAOvUVBl314NhFfrI0P6hNjg/execE',
+    TOKEN:   'hello_sasw_2962!'
   };
-
+ 
   var META = { staff:[], facilities:[], regions:[] };
   var FACSET = {};
   var selectedStaff = [];
   var facilities = [];
   var mode = 'multi';
-
+ 
   /* ── API 호출 (CORS 프리플라이트 회피: Content-Type 미지정 → text/plain) ── */
   function apiGet(action){
     var url = CONFIG.API_URL + '?action=' + encodeURIComponent(action)
@@ -169,11 +425,11 @@
     var body = JSON.stringify(Object.assign({ token: CONFIG.TOKEN }, bodyObj));
     return fetch(CONFIG.API_URL, { method:'POST', body: body }).then(function(r){ return r.json(); });
   }
-
+ 
   /* ── 부팅 ── */
   window.addEventListener('load', function(){
     document.getElementById('date').value = todayISO();
-
+ 
     if (CONFIG.API_URL.indexOf('PASTE_YOUR') === 0){
       document.getElementById('bootLoading').style.display='none';
       showBootErr('설정이 필요합니다: index.html 의 CONFIG.API_URL 과 CONFIG.TOKEN 을 채우세요.');
@@ -187,30 +443,14 @@
       .catch(function(e){ showBootErr('연결 실패: ' + e.message + ' (API_URL 또는 배포 권한을 확인하세요)'); })
       .finally(function(){ document.getElementById('bootLoading').style.display='none'; });
   });
-
+ 
   function showBootErr(msg){
     var b=document.getElementById('bootErr'); b.style.display='block'; b.textContent=msg;
   }
-
+ 
   function onMeta(meta){
-    META = meta;
-    (meta.facilities||[]).forEach(function(f){ FACSET[f]=true; });
-    document.getElementById('ssname').textContent = '대상: ' + meta.spreadsheetName;
-
-    var g = document.getElementById('staffGrid'); g.innerHTML='';
-    (meta.staff||[]).forEach(function(name){
-      var b=document.createElement('button');
-      b.type='button'; b.className='staff-btn'; b.textContent=name;
-      b.onclick=function(){ toggleStaff(name, b); };
-      g.appendChild(b);
-    });
-    var dl=document.getElementById('facList'); dl.innerHTML='';
-    (meta.facilities||[]).forEach(function(f){ var o=document.createElement('option'); o.value=f; dl.appendChild(o); });
-    var rl=document.getElementById('regList'); rl.innerHTML='';
-    (meta.regions||[]).forEach(function(r){ var o=document.createElement('option'); o.value=r; rl.appendChild(o); });
-
+    buildFromMeta(meta);
     document.getElementById('app').style.display='block';
-
     document.getElementById('facInput').addEventListener('keydown', function(e){
       if(e.key==='Enter'){ e.preventDefault(); addFacility(); }
     });
@@ -218,7 +458,34 @@
       if(e.key==='Enter'){ e.preventDefault(); addCustomStaff(); }
     });
   }
-
+ 
+  function buildFromMeta(meta){
+    META = meta;
+    FACSET = {};
+    (meta.facilities||[]).forEach(function(f){ FACSET[f]=true; });
+    document.getElementById('ssname').textContent = '대상: ' + meta.spreadsheetName;
+ 
+    var g = document.getElementById('staffGrid'); g.innerHTML='';
+    (meta.staff||[]).forEach(function(name){
+      var b=document.createElement('button');
+      b.type='button'; b.className='staff-btn';
+      if(selectedStaff.indexOf(name)>=0) b.classList.add('on');
+      b.textContent=name;
+      b.onclick=function(){ toggleStaff(name, b); };
+      g.appendChild(b);
+    });
+    var dl=document.getElementById('facList'); dl.innerHTML='';
+    (meta.facilities||[]).forEach(function(f){ var o=document.createElement('option'); o.value=f; dl.appendChild(o); });
+    var rl=document.getElementById('regList'); rl.innerHTML='';
+    (meta.regions||[]).forEach(function(r){ var o=document.createElement('option'); o.value=r; rl.appendChild(o); });
+ 
+    refreshManage();
+  }
+ 
+  function reloadMeta(){
+    apiGet('meta').then(function(res){ if(res.ok) buildFromMeta(res.data); }).catch(function(){});
+  }
+ 
   /* ── 방문자 ── */
   function toggleStaff(name, btn){
     var i=selectedStaff.indexOf(name);
@@ -231,15 +498,27 @@
     if(!v) return;
     if(selectedStaff.indexOf(v)<0){
       selectedStaff.push(v);
-      var g=document.getElementById('staffGrid');
-      var b=document.createElement('button');
-      b.type='button'; b.className='staff-btn on'; b.textContent=v;
-      b.onclick=function(){ toggleStaff(v,b); };
-      g.appendChild(b);
+      document.getElementById('staffGrid').appendChild(makeCustomStaffBtn(v));
     }
     el.value=''; renderPreview();
   }
-
+  function makeCustomStaffBtn(name){
+    var b=document.createElement('button');
+    b.type='button'; b.className='staff-btn on';
+    var t=document.createElement('span'); t.textContent=name;
+    var x=document.createElement('span'); x.textContent='  ✕'; x.style.opacity='.65';
+    b.appendChild(t); b.appendChild(x);
+    t.onclick=function(){ toggleStaff(name,b); };
+    x.onclick=function(ev){
+      ev.stopPropagation();
+      b.remove();
+      var i=selectedStaff.indexOf(name); if(i>=0) selectedStaff.splice(i,1);
+      renderPreview();
+    };
+    b.onclick=function(ev){ if(ev.target===b) toggleStaff(name,b); };
+    return b;
+  }
+ 
   /* ── 기관 ── */
   function setMode(m){
     mode=m;
@@ -272,7 +551,7 @@
     document.getElementById('regionField').style.display = hasNew ? 'block' : 'none';
     renderPreview();
   }
-
+ 
   /* ── 미리보기 ── */
   function renderPreview(){
     var p=document.getElementById('preview');
@@ -296,7 +575,7 @@
         + '</div>';
     p.innerHTML=html;
   }
-
+ 
   /* ── 제출 ── */
   function submit(){
     if(!selectedStaff.length){ flash('err','방문자를 1명 이상 선택하세요.'); return; }
@@ -323,7 +602,7 @@
         document.getElementById('submitLoading').style.display='none';
       });
   }
-
+ 
   function onSubmitOk(r){
     flash('done','기입 완료되었습니다.');
     var el=document.getElementById('result'); el.style.display='block';
@@ -341,7 +620,7 @@
     el.innerHTML=h;
     facilities=[]; renderChips();
   }
-
+ 
   /* ── 구조 점검 ── */
   function runDiagnose(btn){
     btn.disabled=true;
@@ -354,7 +633,67 @@
       .catch(function(e){ flash('err','점검 실패: '+e.message); })
       .finally(function(){ btn.disabled=false; });
   }
-
+ 
+  /* ── 담당자 관리 ── */
+  function toggleManage(){
+    var b=document.getElementById('manageBody');
+    var open = b.style.display==='none';
+    b.style.display = open?'block':'none';
+    document.getElementById('manageCaret').textContent = open?'▴':'▾';
+  }
+  function refreshManage(){
+    var sel=document.getElementById('manageSelect'); if(!sel) return;
+    sel.innerHTML='';
+    var added=(META.addedStaff||[]);
+    var list=(META.staff||[]);
+    if(!list.length){
+      var o=document.createElement('option'); o.textContent='(담당자 없음)'; o.disabled=true; sel.appendChild(o); return;
+    }
+    list.forEach(function(n){
+      var o=document.createElement('option'); o.value=n;
+      o.textContent = n + (added.indexOf(n)>=0?'  · 앱 추가':'');
+      sel.appendChild(o);
+    });
+  }
+  function previewStaff(){
+    var name=document.getElementById('manageSelect').value;
+    if(!name) return;
+    var box=document.getElementById('managePreview');
+    box.className='preview muted'; box.textContent='확인 중…';
+    apiPost({action:'preview_staff', name:name}).then(function(res){
+      if(!res.ok){ box.className='preview'; box.innerHTML='<span class="wn">'+esc(res.error)+'</span>'; return; }
+      var d=res.data; box.className='preview';
+      if(!d.found){ box.textContent='시트에서 찾지 못했습니다: '+name; return; }
+      box.innerHTML='';
+      var r1=document.createElement('div'); r1.className='row';
+      r1.innerHTML='<b>'+esc(d.name)+'</b> · 시트 '+d.rowNumber+'행 '
+        + (d.isTracked ? '<span class="wn">(앱이 추가한 행)</span>'
+                       : '<span class="wn">(기존 명단 — 주의!)</span>');
+      box.appendChild(r1);
+      var r2=document.createElement('div'); r2.className='row muted';
+      r2.textContent = d.filled.length ? ('기록: '+d.filled.join(' / ')+' · 누계 '+d.total)
+                                       : '기록된 방문 없음 (빈 행)';
+      box.appendChild(r2);
+      var wrap=document.createElement('div'); wrap.style.marginTop='10px';
+      var del=document.createElement('button');
+      del.className='btn'; del.style.background='#dc2626'; del.style.color='#fff';
+      del.textContent='이 담당자 행 삭제';
+      del.onclick=function(){ doDeleteStaff(d.name); };
+      wrap.appendChild(del); box.appendChild(wrap);
+    }).catch(function(e){ box.className='preview'; box.innerHTML='<span class="wn">'+esc(e.message)+'</span>'; });
+  }
+  function doDeleteStaff(name){
+    if(!window.confirm('“'+name+'” 담당자 행을 시트에서 완전히 삭제합니다.\n되돌릴 수 없습니다. 진행할까요?')) return;
+    apiPost({action:'delete_staff', name:name}).then(function(res){
+      if(!res.ok){ flash('err','삭제 실패: '+res.error); return; }
+      flash('done','삭제 완료: '+res.data.name+' ('+res.data.rowNumber+'행)');
+      var i=selectedStaff.indexOf(name); if(i>=0) selectedStaff.splice(i,1);
+      var box=document.getElementById('managePreview');
+      box.className='preview muted'; box.textContent='삭제할 담당자를 선택하고 ‘확인’을 누르세요.';
+      reloadMeta();
+    }).catch(function(e){ flash('err','통신 실패: '+e.message); });
+  }
+ 
   /* ── 유틸 ── */
   function resetForm(){
     selectedStaff=[]; facilities=[];
@@ -373,3 +712,4 @@
 </script>
 </body>
 </html>
+ 
